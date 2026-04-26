@@ -97,17 +97,18 @@ async def _lifespan(server: FastMCP) -> AsyncIterator[None]:
         if state.value == "configured":
             _settings = Settings()
 
-    if not _settings.is_configured:
-        if _multi_user_mode:
-            # Multi-user HTTP mode: per-user backends injected via ContextVar.
-            # No global backend needed — skip unconfigured state.
-            logger.info("Multi-user HTTP mode: per-user backends via bearer auth.")
-            try:
-                yield
-            finally:
-                pass
-            return
+    if _multi_user_mode:
+        # Multi-user HTTP mode: per-user backends are injected via ContextVar.
+        # Never start a global env/relay backend here; that state can mark tools
+        # pending/unconfigured and block valid bearer-authenticated sessions.
+        logger.info("Multi-user HTTP mode: per-user backends via bearer auth.")
+        try:
+            yield
+        finally:
+            pass
+        return
 
+    if not _settings.is_configured:
         _unconfigured = True
         logger.warning(
             "No Telegram credentials configured. "

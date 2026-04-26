@@ -815,6 +815,39 @@ async def test_lifespan_multi_user_mode_unconfigured():
         srv._multi_user_mode = old_multi
 
 
+@pytest.mark.asyncio
+async def test_lifespan_multi_user_mode_configured_skips_global_backend():
+    """Multi-user mode must not start global env backend even when env configured."""
+    import better_telegram_mcp.server as srv
+    from better_telegram_mcp.server import _lifespan
+
+    old_multi = srv._multi_user_mode
+    old_backend = srv._backend
+    try:
+        srv._multi_user_mode = True
+        srv._backend = None
+
+        mock_settings = MagicMock()
+        mock_settings.is_configured = True
+        mock_settings.mode = "user"
+        mock_settings.api_id = 123
+        mock_settings.api_hash = "hash"
+
+        with (
+            patch.object(srv, "Settings", return_value=mock_settings),
+            patch("better_telegram_mcp.backends.user_backend.UserBackend") as mock_user_backend,
+        ):
+            async with _lifespan(mcp):
+                assert srv._backend is None
+                assert srv._unconfigured is not True
+                assert srv._pending_auth is not True
+
+        mock_user_backend.assert_not_called()
+    finally:
+        srv._multi_user_mode = old_multi
+        srv._backend = old_backend
+
+
 # --- get_backend multi-user mode ---
 
 

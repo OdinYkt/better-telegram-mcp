@@ -122,6 +122,33 @@ class TestSetupCredentials:
 
 
 class TestStartHttp:
+    def test_multi_user_http_uses_server_factory_to_set_mode(
+        self, settings: Settings, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Multi-user HTTP startup must set server._multi_user_mode for tools."""
+        import better_telegram_mcp.server as server
+
+        calls: list[str] = []
+
+        class FakeUvicorn:
+            @staticmethod
+            def run(*_args: object, **_kwargs: object) -> None:
+                calls.append("uvicorn.run")
+
+        monkeypatch.setenv("DCR_SERVER_SECRET", "local-secret")
+        monkeypatch.setenv("PUBLIC_URL", "http://vpn:8080")
+        monkeypatch.setenv("TELEGRAM_API_ID", "123")
+        monkeypatch.setenv("TELEGRAM_API_HASH", "hash")
+        monkeypatch.setattr(server, "_multi_user_mode", False)
+
+        with patch.dict("sys.modules", {"uvicorn": FakeUvicorn}):
+            from better_telegram_mcp.transports.http import start_http
+
+            start_http(settings)
+
+        assert calls == ["uvicorn.run"]
+        assert server._multi_user_mode is True
+
     def test_start_http_with_stored_credentials(
         self, settings: Settings, data_dir: Path
     ) -> None:
